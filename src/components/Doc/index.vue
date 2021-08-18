@@ -9,7 +9,7 @@ export default {
   name: 'Doc',
   methods: {
     click() {
-      window.open('https://bianxiaofeng.com', '_blank')
+      window.open('https://bianxiaofeng.com.cn', '_blank')
     }
   }
 }
