@@ -1,286 +1,314 @@
 <template>
   <div class="app-container">
-    <!--工具栏-->
-    <div class="head-container">
-      <div v-if="crud.props.searchToggle">
-        <!-- 搜索 -->
-        <el-input
-          v-model="query.blurry"
-          size="small"
-          clearable
-          placeholder="输入名称或者描述搜索"
-          style="width: 200px;"
-          class="filter-item"
-          @keyup.enter.native="crud.toQuery"
-        />
-        <el-date-picker
-          v-model="query.createTime"
-          :default-time="['00:00:00','23:59:59']"
-          type="daterange"
-          range-separator=":"
-          size="small"
-          class="date-item"
-          value-format="yyyy-MM-dd HH:mm:ss"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
-        />
-        <rrOperation />
-      </div>
-      <crudOperation :permission="permission" />
-    </div>
-    <!-- 表单渲染 -->
-    <el-dialog
-      append-to-body
-      :close-on-click-modal="false"
-      :before-close="crud.cancelCU"
-      :visible.sync="crud.status.cu > 0"
-      :title="crud.status.title"
-      width="520px"
-    >
-      <el-form ref="form" :inline="true" :model="form" :rules="rules" size="small" label-width="80px">
-        <el-form-item label="角色名称" prop="name">
-          <el-input v-model="form.name" style="width: 380px;" />
+    <el-form :inline="true">
+      <el-form-item label="角色名称">
+        <el-input v-model="queryParams.roleName" placeholder="请输入角色名称" clearable size="small" style="width: 240px"
+                  @keyup.enter.native="handleQuery"/>
+      </el-form-item>
+      <el-form-item label="权限字符">
+        <el-input v-model="queryParams.roleKey" placeholder="请输入权限字符" clearable size="small" style="width: 240px"
+                  @keyup.enter.native="handleQuery"/>
+      </el-form-item>
+      <el-form-item label="状态">
+        <el-select v-model="queryParams.status" placeholder="角色状态" clearable size="small" style="width: 240px">
+          <el-option
+            v-for="dict in statusOptions"
+            :key="dict.dictValue"
+            :label="dict.dictLabel"
+            :value="dict.dictValue"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="创建时间">
+        <el-date-picker v-model="dateRange" size="small" style="width: 240px" value-format="yyyy-MM-dd" type="daterange"
+                        range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期"/>
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
+        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
+      </el-form-item>
+    </el-form>
+
+    <el-row :gutter="10" class="mb8">
+      <el-col :span="1.5">
+        <el-button type="primary" icon="el-icon-plus" size="mini"
+                   @click="handleAdd">新增
+        </el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button type="success" icon="el-icon-edit" size="mini" :disabled="single"
+                   @click="handleUpdate(null)">修改
+        </el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button type="danger" icon="el-icon-delete" size="mini" :loading="delLoading" :disabled="multiple"
+                   @click="handleDelete">删除
+        </el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button type="warning" icon="el-icon-download" size="mini"
+                   @click="handleExport">导出
+        </el-button>
+      </el-col>
+    </el-row>
+
+    <el-table v-loading="loading" :data="list" @selection-change="handleSelectionChange">
+      <el-table-column type="selection"/>
+      <el-table-column label="角色名称" prop="roleName" :show-overflow-tooltip="true"/>
+      <el-table-column label="权限字符" prop="roleKey" :show-overflow-tooltip="true"/>
+      <el-table-column label="显示顺序" prop="roleSort"/>
+      <el-table-column label="状态">
+        <template slot-scope="scope">
+          <el-switch v-model="scope.row.status" active-value="0" inactive-value="1"
+                     @change="handleStatusChange(scope.row)"/>
+        </template>
+      </el-table-column>
+      <el-table-column label="创建时间" prop="createTime">
+        <template slot-scope="scope">
+          <span>{{ parseTime(scope.row.createTime) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" class-name="small-padding fixed-width">
+        <template slot-scope="scope">
+          <el-button size="mini" type="text" icon="el-icon-edit"
+                     @click="handleUpdate(scope.row)">修改
+          </el-button>
+          <el-popover :ref="scope.row.id" placement="top" width="180">
+            <p>确定删除本条数据吗？</p>
+            <div style="text-align: right; margin: 0">
+              <el-button size="mini" type="text" @click="$refs[scope.row.id].doClose()">取消
+              </el-button>
+              <el-button :loading="loading" type="primary" size="mini" @click="handleSubDelete(scope.row.id)">确定
+              </el-button>
+            </div>
+            <el-button slot="reference" type="text" icon="el-icon-delete" size="mini">删除
+            </el-button>
+          </el-popover>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <pagination v-show="total>0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize"
+                @pagination="init"/>
+
+    <!-- 添加或修改角色配置对话框 -->
+    <el-dialog :close-on-click-modal="false" :title="title" :visible.sync="open" width="500px">
+      <el-form ref="form" :model="form" :rules="rules" label-width="80px">
+        <el-form-item label="角色名称" prop="roleName">
+          <el-input v-model="form.roleName" placeholder="请输入角色名称"/>
         </el-form-item>
-        <el-form-item label="角色级别" prop="level">
-          <el-input-number v-model.number="form.level" :min="1" controls-position="right" style="width: 145px;" />
+        <el-form-item label="权限字符" prop="roleKey">
+          <el-input v-model="form.roleKey" placeholder="请输入权限字符"/>
         </el-form-item>
-        <el-form-item label="描述信息" prop="description">
-          <el-input v-model="form.description" style="width: 380px;" rows="5" type="textarea" />
+        <el-form-item label="角色顺序" prop="roleSort">
+          <el-input-number v-model="form.roleSort" controls-position="right" :min="0"/>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-radio-group v-model="form.status">
+            <el-radio
+              v-for="dict in statusOptions"
+              :key="dict.dictValue"
+              :label="dict.dictValue"
+            >{{dict.dictLabel}}
+            </el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="菜单权限">
+          <el-tree
+            :data="menuOptions"
+            show-checkbox
+            ref="menu"
+            node-key="id"
+            empty-text="加载中，请稍后"
+            :props="defaultProps"
+          ></el-tree>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="form.remark" type="textarea" placeholder="请输入内容"></el-input>
         </el-form-item>
       </el-form>
       <div slot="footer" class="dialog-footer">
-        <el-button type="text" @click="crud.cancelCU">取消</el-button>
-        <el-button :loading="crud.status.cu === 2" type="primary" @click="crud.submitCU">确认</el-button>
+        <el-button type="primary" @click="submitForm">确 定</el-button>
+        <el-button @click="cancel">取 消</el-button>
       </div>
     </el-dialog>
-    <el-row :gutter="15">
-      <!--角色管理-->
-      <el-col :xs="24" :sm="24" :md="16" :lg="16" :xl="17" style="margin-bottom: 10px">
-        <el-card class="box-card" shadow="never">
-          <div slot="header" class="clearfix">
-            <span class="role-span">角色列表</span>
-          </div>
-          <el-table
-            ref="table"
-            v-loading="crud.loading"
-            highlight-current-row
-            style="width: 100%;"
-            :data="crud.data"
-            @selection-change="crud.selectionChangeHandler"
-            @current-change="handleCurrentChange"
-          >
-            <el-table-column :selectable="checkboxT" type="selection" width="55" />
-            <el-table-column prop="name" label="名称" />
-            <el-table-column prop="level" label="角色级别" />
-            <el-table-column :show-overflow-tooltip="true" prop="description" label="描述" />
-            <el-table-column :show-overflow-tooltip="true" width="135px" prop="createTime" label="创建日期">
-              <template slot-scope="scope">
-                <span>{{ parseTime(scope.row.createTime) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column
-              v-permission="['admin','roles:edit','roles:del']"
-              label="操作"
-              width="130px"
-              align="center"
-              fixed="right"
-            >
-              <template slot-scope="scope">
-                <udOperation
-                  v-if="scope.row.level >= level"
-                  :data="scope.row"
-                  :permission="permission"
-                />
-              </template>
-            </el-table-column>
-          </el-table>
-          <!--分页组件-->
-          <pagination />
-        </el-card>
-      </el-col>
-      <!-- 菜单授权 -->
-      <el-col :xs="24" :sm="24" :md="8" :lg="8" :xl="7">
-        <el-card class="box-card" shadow="never">
-          <div slot="header" class="clearfix">
-            <el-tooltip class="item" effect="dark" content="选择指定角色分配菜单" placement="top">
-              <span class="role-span">菜单分配</span>
-            </el-tooltip>
-            <el-button
-              v-permission="['admin','roles:edit']"
-              :disabled="!showButton"
-              :loading="menuLoading"
-              icon="el-icon-check"
-              size="mini"
-              style="float: right; padding: 6px 9px"
-              type="primary"
-              @click="saveMenu"
-            >保存
-            </el-button>
-          </div>
-          <el-tree
-            ref="menu"
-            lazy
-            :data="menus"
-            :default-checked-keys="menuIds"
-            :load="getMenuDatas"
-            :props="defaultProps"
-            check-strictly
-            accordion
-            show-checkbox
-            node-key="id"
-          />
-        </el-card>
-      </el-col>
-    </el-row>
+
   </div>
 </template>
 
 <script>
-import crudRoles from '@/api/system/role'
-import { getMenusTree, getMenuSuperior } from '@/api/system/menu'
-import CRUD, { presenter, header, form, crud } from '@crud/crud'
-import rrOperation from '@crud/RR.operation'
-import crudOperation from '@crud/CRUD.operation'
-import udOperation from '@crud/UD.operation'
-import pagination from '@crud/Pagination'
-import Treeselect from '@riophae/vue-treeselect'
-import '@riophae/vue-treeselect/dist/vue-treeselect.css'
+  import {getRole, addRole, updateRole, changeRoleStatus} from "@/api/system/role";
+  import {treeselect as menuTreeselect, roleMenuTreeselect} from "@/api/system/menu";
+  import initData from '@/mixins/initData'
 
-const defaultForm = { id: null, name: null, description: null, level: 3 }
-export default {
-  name: 'Role',
-  components: { Treeselect, pagination, crudOperation, rrOperation, udOperation },
-  cruds() {
-    return CRUD({ title: '角色', url: 'api/roles', sort: 'level,asc', crudMethod: { ...crudRoles }})
-  },
-  mixins: [presenter(), header(), form(defaultForm), crud()],
-  data() {
-    return {
-      defaultProps: { children: 'children', label: 'label', isLeaf: 'leaf' },
-      level: 3,
-      currentId: 0, menuLoading: false, showButton: false,
-      menus: [], menuIds: [],
-      permission: {
-        add: ['admin', 'roles:add'],
-        edit: ['admin', 'roles:edit'],
-        del: ['admin', 'roles:del']
-      },
-      rules: {
-        name: [
-          { required: true, message: '请输入名称', trigger: 'blur' }
-        ],
-        permission: [
-          { required: true, message: '请输入权限', trigger: 'blur' }
-        ]
-      }
-    }
-  },
-  created() {
-    crudRoles.getLevel().then(data => {
-      this.level = data.level
-    })
-  },
-  methods: {
-    getMenuDatas(node, resolve) {
-      setTimeout(() => {
-        getMenusTree(node.data.id ? node.data.id : 0).then(res => {
-          resolve(res)
-        })
-      }, 100)
-    },
-    [CRUD.HOOK.afterRefresh]() {
-      this.$refs.menu.setCheckedKeys([])
-    },
-    [CRUD.HOOK.afterAddError](crud) {
-      this.afterErrorMethod(crud)
-    },
-    [CRUD.HOOK.afterEditError](crud) {
-      this.afterErrorMethod(crud)
-    },
-    // 触发单选
-    handleCurrentChange(val) {
-      if (val) {
-        // 先将保存按钮置灰
-        this.showButton = false
-        const _this = this
-        // 清空菜单的选中
-        this.$refs.menu.setCheckedKeys([])
-        // 保存当前的角色id
-        this.currentId = val.id
-        // 初始化
-        this.menuIds = []
-        // 菜单数据需要特殊处理
-        val.menus.forEach(function(data, index) {
-          _this.menuIds.push(data.id)
-        })
-        getMenuSuperior(this.menuIds).then(res => {
-          this.menus = res
-          // 待所有菜单加载完再允许点击保存按钮
-          this.showButton = this.level <= val.level
-        })
-      }
-    },
-    // 保存菜单
-    saveMenu() {
-      this.menuLoading = true
-      const role = { id: this.currentId, menus: [] }
-      // 得到半选的父节点数据，保存起来
-      this.$refs.menu.getHalfCheckedNodes().forEach(function(data, index) {
-        const menu = { id: data.id }
-        role.menus.push(menu)
-      })
-      // 得到已选中的 key 值
-      this.$refs.menu.getCheckedKeys().forEach(function(data, index) {
-        const menu = { id: data }
-        role.menus.push(menu)
-      })
-      crudRoles.editMenu(role).then(res => {
-        this.crud.notify('保存成功', CRUD.NOTIFICATION_TYPE.SUCCESS)
-        this.menuLoading = false
-        this.update()
-      }).catch(err => {
-        this.menuLoading = false
-        console.log(err.response.data.message)
-      })
-    },
-    // 改变数据
-    update() {
-      // 无刷新更新 表格数据
-      crudRoles.get(this.currentId).then(res => {
-        for (let i = 0; i < this.crud.data.length; i++) {
-          if (res.id === this.crud.data[i].id) {
-            this.crud.data[i] = res
-            break
-          }
+  export default {
+    mixins: [initData],
+    data() {
+      return {
+        // 状态数据字典
+        statusOptions: [],
+        // 菜单列表
+        menuOptions: [],
+        // 查询参数
+        queryParams: {
+          roleName: undefined,
+          roleKey: undefined,
+          status: undefined
+        },
+        defaultProps: {
+          children: "children",
+          label: "label"
+        },
+        // 表单校验
+        rules: {
+          roleName: [
+            {required: true, message: "角色名称不能为空", trigger: "blur"}
+          ],
+          roleKey: [
+            {required: true, message: "权限字符不能为空", trigger: "blur"}
+          ],
+          roleSort: [
+            {required: true, message: "角色顺序不能为空", trigger: "blur"}
+          ]
         }
-      })
+      };
     },
-    checkboxT(row, rowIndex) {
-      return row.level >= this.level
+    created() {
+      this.$nextTick(() => {
+        this.init()
+      });
+      this.getDicts("sys_normal_disable").then(response => {
+        this.statusOptions = response.data;
+      });
+    },
+    methods: {
+      beforeInit() {
+        this.base = '/system/role';
+        this.modelName = '角色';
+        return true
+      },
+      /** 查询菜单树结构 */
+      getMenuTreeselect() {
+        menuTreeselect().then(response => {
+          this.menuOptions = response.data;
+        });
+      },
+      /** 查询部门树结构 */
+      getDeptTreeselect() {
+        deptTreeselect().then(response => {
+          this.deptOptions = response.data;
+        });
+      },
+      // 所有菜单节点数据
+      getMenuAllCheckedKeys() {
+        // 目前被选中的菜单节点
+        let checkedKeys = this.$refs.menu.getHalfCheckedKeys();
+        // 半选中的菜单节点
+        let halfCheckedKeys = this.$refs.menu.getCheckedKeys();
+        checkedKeys.unshift.apply(checkedKeys, halfCheckedKeys);
+        return checkedKeys;
+      },
+      // 所有部门节点数据
+      getDeptAllCheckedKeys() {
+        // 目前被选中的部门节点
+        let checkedKeys = this.$refs.dept.getHalfCheckedKeys();
+        // 半选中的部门节点
+        let halfCheckedKeys = this.$refs.dept.getCheckedKeys();
+        checkedKeys.unshift.apply(checkedKeys, halfCheckedKeys);
+        return checkedKeys;
+      },
+      /** 根据角色ID查询菜单树结构 */
+      getRoleMenuTreeselect(id) {
+        roleMenuTreeselect(id).then(response => {
+          this.menuOptions = response.menus;
+          this.$refs.menu.setCheckedKeys(response.checkedKeys);
+        });
+      },
+      // 角色状态修改
+      handleStatusChange(row) {
+        let text = row.status === "0" ? "启用" : "停用";
+        this.$confirm('确认要"' + text + '""' + row.roleName + '"角色吗?', "警告", {
+          confirmButtonText: "确定",
+          cancelButtonText: "取消",
+          type: "warning"
+        }).then(function () {
+          return changeRoleStatus(row.id, row.status);
+        }).then((response) => {
+          if (response.code == 200) {
+            this.msgSuccess(text + "成功");
+          } else {
+            this.msgError(text + "失败");
+          }
+        }).catch(function () {
+          row.status = row.status === "0" ? "1" : "0";
+        });
+      },
+      // 表单重置
+      reset() {
+        if (this.$refs.menu != undefined) {
+          this.$refs.menu.setCheckedKeys([]);
+        }
+        this.form = {
+          id: undefined,
+          roleName: undefined,
+          roleKey: undefined,
+          roleSort: 0,
+          status: "0",
+          menuIds: [],
+          deptIds: [],
+          remark: undefined
+        };
+        this.resetForm("form");
+      },
+      /** 新增按钮操作 */
+      handleAdd() {
+        this.reset();
+        this.getMenuTreeselect();
+        this.open = true;
+        this.title = "添加角色";
+      },
+      /** 修改按钮操作 */
+      handleUpdate(row) {
+        this.reset();
+        this.$nextTick(() => {
+          this.getRoleMenuTreeselect(row.id);
+        });
+        getRole(row.id).then(response => {
+          this.form = response.data;
+          this.open = true;
+          this.title = "修改角色";
+        });
+      },
+      /** 提交按钮 */
+      submitForm: function () {
+        this.$refs["form"].validate(valid => {
+          if (valid) {
+            if (this.form.id != undefined) {
+              this.form.menuIds = this.getMenuAllCheckedKeys();
+              updateRole(this.form).then(response => {
+                if (response.code === 200) {
+                  this.msgSuccess("修改成功");
+                  this.open = false;
+                  this.init();
+                } else {
+                  this.msgError(response.msg);
+                }
+              });
+            } else {
+              this.form.menuIds = this.getMenuAllCheckedKeys();
+              addRole(this.form).then(response => {
+                if (response.code === 200) {
+                  this.msgSuccess("新增成功");
+                  this.open = false;
+                  this.open();
+                } else {
+                  this.msgError(response.msg);
+                }
+              });
+            }
+          }
+        });
+      },
     }
-  }
-}
+  };
 </script>
-
-<style rel="stylesheet/scss" lang="scss">
-  .role-span {
-    font-weight: bold;
-    color: #303133;
-    font-size: 15px;
-  }
-</style>
-
-<style rel="stylesheet/scss" lang="scss" scoped>
-  /deep/ .el-input-number .el-input__inner {
-    text-align: left;
-  }
-
-  /deep/ .vue-treeselect__multi-value {
-    margin-bottom: 0;
-  }
-
-  /deep/ .vue-treeselect__multi-value-item {
-    border: 0;
-    padding: 0;
-  }
-</style>

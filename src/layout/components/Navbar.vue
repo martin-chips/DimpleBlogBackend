@@ -1,53 +1,43 @@
 <template>
   <div class="navbar">
-    <hamburger
-      id="hamburger-container"
-      :is-active="sidebar.opened"
-      class="hamburger-container"
-      @toggleClick="toggleSideBar"
-    />
+    <hamburger id="hamburger-container" :is-active="sidebar.opened" class="hamburger-container"
+               @toggleClick="toggleSideBar"/>
 
-    <breadcrumb id="breadcrumb-container" class="breadcrumb-container" />
+    <breadcrumb id="breadcrumb-container" class="breadcrumb-container"/>
 
     <div class="right-menu">
       <template v-if="device!=='mobile'">
-        <search id="header-search" class="right-menu-item" />
-
-        <el-tooltip content="项目文档" effect="dark" placement="bottom">
-          <Doc class="right-menu-item hover-effect" />
+        <search id="header-search" class="right-menu-item"/>
+        <el-tooltip content="源码地址" effect="dark" placement="bottom">
+          <dimple-blog-git id="dimpleblog-git" class="right-menu-item hover-effect"/>
         </el-tooltip>
-
-        <el-tooltip content="全屏缩放" effect="dark" placement="bottom">
-          <screenfull id="screenfull" class="right-menu-item hover-effect" />
+        <el-tooltip content="文档地址" effect="dark" placement="bottom">
+          <dimple-blog-doc id="dimpleblog-doc" class="right-menu-item hover-effect"/>
         </el-tooltip>
-
-        <el-tooltip content="布局设置" effect="dark" placement="bottom">
-          <size-select id="size-select" class="right-menu-item hover-effect" />
+        <el-tooltip content="全屏" effect="dark" placement="bottom">
+          <screenfull id="screenfull" class="right-menu-item hover-effect"/>
+        </el-tooltip>
+        <el-tooltip content="布局大小" effect="dark" placement="bottom">
+          <size-select id="size-select" class="right-menu-item hover-effect"/>
         </el-tooltip>
 
       </template>
 
       <el-dropdown class="avatar-container right-menu-item hover-effect" trigger="click">
         <div class="avatar-wrapper">
-          <img :src="user.avatarName ? baseApi + '/avatar/' + user.avatarName : Avatar" class="user-avatar">
-          <i class="el-icon-caret-bottom" />
+          <img :src="require(`@/assets/avatar/${this.$store.state.user.avatar}`)" class="user-avatar">
+          <i class="el-icon-caret-bottom"/>
         </div>
         <el-dropdown-menu slot="dropdown">
-          <span style="display:block;" @click="show = true">
-            <el-dropdown-item>
-              布局设置
-            </el-dropdown-item>
-          </span>
-          <router-link to="/user/center">
-            <el-dropdown-item>
-              个人中心
-            </el-dropdown-item>
+          <router-link to="/user/profile">
+            <el-dropdown-item>个人中心</el-dropdown-item>
           </router-link>
-          <span style="display:block;" @click="open">
-            <el-dropdown-item divided>
-              退出登录
-            </el-dropdown-item>
-          </span>
+          <el-dropdown-item>
+            <span @click="setting = true">布局设置</span>
+          </el-dropdown-item>
+          <el-dropdown-item divided>
+            <span @click="logout">退出登录</span>
+          </el-dropdown-item>
         </el-dropdown-menu>
       </el-dropdown>
     </div>
@@ -55,69 +45,60 @@
 </template>
 
 <script>
-import { mapGetters } from 'vuex'
-import Breadcrumb from '@/components/Breadcrumb'
-import Hamburger from '@/components/Hamburger'
-import Doc from '@/components/Doc'
-import Screenfull from '@/components/Screenfull'
-import SizeSelect from '@/components/SizeSelect'
-import Search from '@/components/HeaderSearch'
-import Avatar from '@/assets/images/avatar.png'
+  import {mapGetters} from 'vuex'
+  import Breadcrumb from '@/components/Breadcrumb'
+  import Hamburger from '@/components/Hamburger'
+  import Screenfull from '@/components/Screenfull'
+  import SizeSelect from '@/components/SizeSelect'
+  import Search from '@/components/HeaderSearch'
+  import DimpleBlogGit from '@/components/DimpleBlog/Git'
+  import DimpleBlogDoc from '@/components/DimpleBlog/Doc'
 
-export default {
-  components: {
-    Breadcrumb,
-    Hamburger,
-    Screenfull,
-    SizeSelect,
-    Search,
-    Doc
-  },
-  data() {
-    return {
-      Avatar: Avatar,
-      dialogVisible: false
-    }
-  },
-  computed: {
-    ...mapGetters([
-      'sidebar',
-      'device',
-      'user',
-      'baseApi'
-    ]),
-    show: {
-      get() {
-        return this.$store.state.settings.showSettings
+  export default {
+    components: {
+      Breadcrumb,
+      Hamburger,
+      Screenfull,
+      SizeSelect,
+      Search,
+      DimpleBlogGit,
+      DimpleBlogDoc
+    },
+    computed: {
+      ...mapGetters([
+        'sidebar',
+        'avatar',
+        'device'
+      ]),
+      setting: {
+        get() {
+          return this.$store.state.settings.showSettings
+        },
+        set(val) {
+          this.$store.dispatch('settings/changeSetting', {
+            key: 'showSettings',
+            value: val
+          })
+        }
+      }
+    },
+    methods: {
+      toggleSideBar() {
+        this.$store.dispatch('app/toggleSideBar')
       },
-      set(val) {
-        this.$store.dispatch('settings/changeSetting', {
-          key: 'showSettings',
-          value: val
+      async logout() {
+        this.$confirm('确定注销并退出系统吗？', '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(() => {
+          this.$store.dispatch('LogOut').then(() => {
+            location.reload()
+          })
         })
       }
     }
-  },
-  methods: {
-    toggleSideBar() {
-      this.$store.dispatch('app/toggleSideBar')
-    },
-    open() {
-      this.$confirm('确定注销并退出系统吗？', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }).then(() => {
-        this.logout()
-      })
-    },
-    logout() {
-      this.$store.dispatch('LogOut').then(() => {
-        location.reload()
-      })
-    }
   }
-}
 </script>
 
 <style lang="scss" scoped>
@@ -136,9 +117,11 @@ export default {
       transition: background .3s;
       -webkit-tap-highlight-color: transparent;
 
-      &:hover {
+      &
+      :hover {
         background: rgba(0, 0, 0, .025)
       }
+
     }
 
     .breadcrumb-container {
@@ -155,7 +138,8 @@ export default {
       height: 100%;
       line-height: 50px;
 
-      &:focus {
+      &
+      :focus {
         outline: none;
       }
 
@@ -167,13 +151,16 @@ export default {
         color: #5a5e66;
         vertical-align: text-bottom;
 
-        &.hover-effect {
+        &
+        .hover-effect {
           cursor: pointer;
           transition: background .3s;
 
-          &:hover {
+          &
+          :hover {
             background: rgba(0, 0, 0, .025)
           }
+
         }
       }
 
@@ -198,6 +185,7 @@ export default {
             top: 25px;
             font-size: 12px;
           }
+
         }
       }
     }

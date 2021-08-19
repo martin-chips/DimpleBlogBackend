@@ -6,7 +6,7 @@
       </keep-alive>
     </transition>
     <div v-if="$store.state.settings.showFooter" id="el-main-footer">
-      <span v-html="$store.state.settings.footerTxt" />
+      <span v-html="$store.state.settings.footerTxt"/>
       <span> ⋅ </span>
       <a href="http://www.beian.miit.gov.cn" target="_blank">{{ $store.state.settings.caseNumber }}</a>
     </div>
@@ -14,49 +14,49 @@
 </template>
 
 <script>
-export default {
-  name: 'AppMain',
-  computed: {
-    cachedViews() {
-      return this.$store.state.tagsView.cachedViews
-    },
-    key() {
-      return this.$route.path
+  export default {
+    name: 'AppMain',
+    computed: {
+      cachedViews() {
+        return this.$store.state.tagsView.cachedViews
+      },
+      key() {
+        return this.$route.path
+      }
     }
   }
-}
 </script>
 
 <style lang="scss" scoped>
   .app-main {
-    /* 50= navbar  50  */
     min-height: calc(100vh - 50px);
     width: 100%;
     position: relative;
     overflow: hidden;
+    padding-bottom: 25px;
   }
 
-  .fixed-header + .app-main {
+  .fixed-header+.app-main {
     padding-top: 50px;
   }
 
   .hasTagsView {
-    .app-main {
-      /* 84 = navbar + tags-view = 50 + 34 */
-      min-height: calc(100vh - 84px);
-    }
-
-    .fixed-header + .app-main {
-      padding-top: 84px;
-    }
+  .app-main {
+    /* 84 = navbar + tags-view = 50 + 34 */
+    min-height: calc(100vh - 84px);
   }
-</style>
 
-<style lang="scss">
+  .fixed-header+.app-main {
+    padding-top: 84px;
+  }
+  }
+  </style>
+
+    <style lang="scss">
   // fix css style bug in open el-dialog
-  .el-popup-parent--hidden {
-    .fixed-header {
-      padding-right: 15px;
-    }
+     .el-popup-parent--hidden {
+  .fixed-header {
+    padding-right: 15px;
+  }
   }
 </style>

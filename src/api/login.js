@@ -1,35 +1,40 @@
 import request from '@/utils/request'
 
+// 登录方法
 export function login(username, password, code, uuid) {
+  const data = {
+    username,
+    password,
+    code,
+    uuid
+  };
   return request({
-    url: 'auth/login',
+    url: '/login',
     method: 'post',
-    data: {
-      username,
-      password,
-      code,
-      uuid
-    }
+    params: data
   })
 }
 
+// 获取用户详细信息
 export function getInfo() {
   return request({
-    url: 'auth/info',
+    url: '/getInfo',
     method: 'get'
   })
 }
 
-export function getCodeImg() {
-  return request({
-    url: 'auth/code',
-    method: 'get'
-  })
-}
-
+// 退出方法
 export function logout() {
   return request({
-    url: 'auth/logout',
-    method: 'delete'
+    url: '/logout',
+    method: 'post'
+  })
+}
+
+// 获取验证码
+export function getCodeImg() {
+  return request({
+    url: '/captchaImage',
+    method: 'get'
   })
 }

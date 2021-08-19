@@ -1,360 +1,352 @@
 <template>
   <div class="app-container">
-    <el-row :gutter="20">
-      <!--用户数据-->
-      <el-col :xs="15" :sm="18" :md="19" :lg="20" :xl="20">
-        <!--工具栏-->
-        <div class="head-container">
-          <div v-if="crud.props.searchToggle">
-            <!-- 搜索 -->
-            <el-input
-              v-model="query.blurry"
-              clearable
-              size="small"
-              placeholder="输入名称或者邮箱搜索"
-              style="width: 200px;"
-              class="filter-item"
-              @keyup.enter.native="crud.toQuery"
-            />
-            <el-date-picker
-              v-model="query.createTime"
-              :default-time="['00:00:00','23:59:59']"
-              type="daterange"
-              range-separator=":"
-              size="small"
-              class="date-item"
-              value-format="yyyy-MM-dd HH:mm:ss"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-            />
-            <el-select
-              v-model="query.enabled"
-              clearable
-              size="small"
-              placeholder="状态"
-              class="filter-item"
-              style="width: 90px"
-              @change="crud.toQuery"
-            >
-              <el-option
-                v-for="item in enabledTypeOptions"
-                :key="item.key"
-                :label="item.display_name"
-                :value="item.key"
-              />
-            </el-select>
-            <rrOperation />
-          </div>
-          <crudOperation show="" :permission="permission" />
-        </div>
-        <!--表单渲染-->
-        <el-dialog
-          append-to-body
-          :close-on-click-modal="false"
-          :before-close="crud.cancelCU"
-          :visible.sync="crud.status.cu > 0"
-          :title="crud.status.title"
-          width="570px"
-        >
-          <el-form ref="form" :inline="true" :model="form" :rules="rules" size="small" label-width="66px">
-            <el-form-item label="用户名" prop="username">
-              <el-input v-model="form.username" />
+    <el-form :inline="true" label-width="68px">
+      <el-form-item label="用户名称">
+        <el-input v-model="queryParams.userName" placeholder="请输入用户名称" clearable size="small"
+                  @keyup.enter.native="handleQuery"/>
+      </el-form-item>
+      <el-form-item label="手机号码">
+        <el-input v-model="queryParams.phone" placeholder="请输入手机号码" clearable size="small"
+                  @keyup.enter.native="handleQuery"/>
+      </el-form-item>
+      <el-form-item label="状态">
+        <el-select v-model="queryParams.status" placeholder="用户状态" clearable size="small">
+          <el-option
+            v-for="dict in statusOptions"
+            :key="dict.dictValue"
+            :label="dict.dictLabel"
+            :value="dict.dictValue"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="创建时间">
+        <el-date-picker v-model="dateRange" size="small" value-format="yyyy-MM-dd"
+                        type="daterange" range-separator="-" start-placeholder="开始日期" end-placeholder="结束日期"/>
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" icon="el-icon-search" size="mini"
+                   @click="handleQuery">搜索
+        </el-button>
+        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
+      </el-form-item>
+    </el-form>
+
+    <el-row :gutter="10" class="mb8">
+      <el-col :span="1.5">
+        <el-button type="primary" icon="el-icon-plus" size="mini"
+                   @click="handleAdd">新增
+        </el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button type="success" icon="el-icon-edit" size="mini" :disabled="single"
+                   @click="handleUpdate(null)">修改
+        </el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button type="danger" icon="el-icon-delete" size="mini" :loading="delLoading" :disabled="multiple"
+                   @click="handleDelete">删除
+        </el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button type="warning" icon="el-icon-download" size="mini"
+                   @click="handleExport">导出
+        </el-button>
+      </el-col>
+    </el-row>
+
+    <el-table v-loading="loading" :data="list" @selection-change="handleSelectionChange">
+      <el-table-column type="selection"/>
+      <el-table-column label="用户名称" prop="userName"/>
+      <el-table-column label="用户昵称" prop="nickName"/>
+      <el-table-column label="手机号码" prop="phone"/>
+      <el-table-column label="状态">
+        <template slot-scope="scope">
+          <el-switch v-model="scope.row.status" active-value="0" inactive-value="1"
+                     @change="handleStatusChange(scope.row)"/>
+        </template>
+      </el-table-column>
+      <el-table-column label="创建时间" prop="createTime" width="160">
+        <template slot-scope="scope">
+          <span>{{ parseTime(scope.row.createTime) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="180" class-name="small-padding fixed-width">
+        <template slot-scope="scope">
+          <el-button size="mini" type="text" icon="el-icon-edit"
+                     @click="handleUpdate(scope.row)">修改
+          </el-button>
+          <el-popover :ref="scope.row.id" placement="top" width="180">
+            <p>确定删除本条数据吗？</p>
+            <div style="text-align: right; margin: 0">
+              <el-button size="mini" type="text" @click="$refs[scope.row.id].doClose()">取消
+              </el-button>
+              <el-button :loading="loading" type="primary" size="mini" @click="handleSubDelete(scope.row.id)">确定
+              </el-button>
+            </div>
+            <el-button slot="reference" type="text" icon="el-icon-delete" size="mini">删除
+            </el-button>
+          </el-popover>
+          <el-button size="mini" type="text" icon="el-icon-key"
+                     @click="handleResetPwd(scope.row)">重置
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <pagination v-show="total>0" :total="total" :page.sync="queryParams.pageNum" :limit.sync="queryParams.pageSize"
+                @pagination="init"/>
+
+    <!-- 添加或修改用户对话框 -->
+    <el-dialog :close-on-click-modal="false" :title="title" :visible.sync="open" width="600px">
+      <el-form ref="form" :model="form" :rules="rules" label-width="80px">
+        <el-row>
+          <el-col :span="12">
+            <el-form-item label="用户昵称" prop="nickName">
+              <el-input v-model="form.nickName" placeholder="请输入用户昵称"/>
             </el-form-item>
-            <el-form-item label="电话" prop="phone">
-              <el-input v-model.number="form.phone" />
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="手机号码" prop="phone">
+              <el-input v-model="form.phone" placeholder="请输入手机号码" maxlength="11"/>
             </el-form-item>
-            <el-form-item label="昵称" prop="nickName">
-              <el-input v-model="form.nickName" />
-            </el-form-item>
+          </el-col>
+          <el-col :span="12">
             <el-form-item label="邮箱" prop="email">
-              <el-input v-model="form.email" />
+              <el-input v-model="form.email" placeholder="请输入邮箱" maxlength="50"/>
             </el-form-item>
-            <el-form-item label="性别">
-              <el-radio-group v-model="form.gender" style="width: 178px">
-                <el-radio label="男">男</el-radio>
-                <el-radio label="女">女</el-radio>
-              </el-radio-group>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="用户名称" prop="userName">
+              <el-input v-model="form.userName" placeholder="请输入用户名称"/>
             </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item v-if="form.id == undefined" label="用户密码" prop="password">
+              <el-input v-model="form.password" placeholder="请输入用户密码" type="password"/>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="用户性别">
+              <el-select v-model="form.sex" placeholder="请选择">
+                <el-option
+                  v-for="dict in sexOptions"
+                  :key="dict.dictValue"
+                  :label="dict.dictLabel"
+                  :value="dict.dictValue"
+                ></el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
             <el-form-item label="状态">
-              <el-radio-group v-model="form.enabled" :disabled="form.id === user.id">
+              <el-radio-group v-model="form.status">
                 <el-radio
-                  v-for="item in dict.user_status"
-                  :key="item.id"
-                  :label="item.value"
-                >{{ item.label }}
+                  v-for="dict in statusOptions"
+                  :key="dict.dictValue"
+                  :label="dict.dictValue"
+                >{{dict.dictLabel}}
                 </el-radio>
               </el-radio-group>
             </el-form-item>
-            <el-form-item style="margin-bottom: 0;" label="角色" prop="roles">
-              <el-select
-                v-model="form.roles"
-                style="width: 437px"
-                multiple
-                placeholder="请选择"
-                @remove-tag="deleteTag"
-                @change="changeRole"
-              >
+          </el-col>
+
+          <el-col :span="12">
+            <el-form-item label="角色">
+              <el-select v-model="form.roleIds" multiple placeholder="请选择">
                 <el-option
-                  v-for="item in roles"
-                  :key="item.name"
-                  :disabled="level !== 1 && item.level <= level"
-                  :label="item.name"
+                  v-for="item in roleOptions"
+                  :key="item.id"
+                  :label="item.roleName"
                   :value="item.id"
-                />
+                  :disabled="item.status == 1"
+                ></el-option>
               </el-select>
             </el-form-item>
-          </el-form>
-          <div slot="footer" class="dialog-footer">
-            <el-button type="text" @click="crud.cancelCU">取消</el-button>
-            <el-button :loading="crud.status.cu === 2" type="primary" @click="crud.submitCU">确认</el-button>
-          </div>
-        </el-dialog>
-        <!--表格渲染-->
-        <el-table
-          ref="table"
-          v-loading="crud.loading"
-          :data="crud.data"
-          style="width: 100%;"
-          @selection-change="crud.selectionChangeHandler"
-        >
-          <el-table-column :selectable="checkboxT" type="selection" width="55" />
-          <el-table-column :show-overflow-tooltip="true" prop="username" label="用户名" />
-          <el-table-column :show-overflow-tooltip="true" prop="nickName" label="昵称" />
-          <el-table-column prop="gender" label="性别" />
-          <el-table-column :show-overflow-tooltip="true" prop="phone" width="100" label="电话" />
-          <el-table-column :show-overflow-tooltip="true" width="135" prop="email" label="邮箱" />
-          <el-table-column label="状态" align="center" prop="enabled">
-            <template slot-scope="scope">
-              <el-switch
-                v-model="scope.row.enabled"
-                :disabled="user.id === scope.row.id"
-                active-color="#409EFF"
-                inactive-color="#F56C6C"
-                @change="changeEnabled(scope.row, scope.row.enabled)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column :show-overflow-tooltip="true" prop="createTime" width="135" label="创建日期">
-            <template slot-scope="scope">
-              <span>{{ parseTime(scope.row.createTime) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column
-            v-permission="['admin','user:edit','user:del']"
-            label="操作"
-            width="115"
-            align="center"
-            fixed="right"
-          >
-            <template slot-scope="scope">
-              <udOperation
-                :data="scope.row"
-                :permission="permission"
-                :disabled-dle="scope.row.id === user.id"
-              />
-            </template>
-          </el-table-column>
-        </el-table>
-        <!--分页组件-->
-        <pagination />
-      </el-col>
-    </el-row>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="备注">
+              <el-input v-model="form.remark" type="textarea" placeholder="请输入内容"></el-input>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="primary" @click="submitForm">确 定</el-button>
+        <el-button @click="cancel">取 消</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import crudUser from '@/api/system/user'
-import { isvalidPhone } from '@/utils/validate'
-import { getAll, getLevel } from '@/api/system/role'
-import CRUD, { presenter, header, form, crud } from '@crud/crud'
-import rrOperation from '@crud/RR.operation'
-import crudOperation from '@crud/CRUD.operation'
-import udOperation from '@crud/UD.operation'
-import pagination from '@crud/Pagination'
-import Treeselect from '@riophae/vue-treeselect'
-import { mapGetters } from 'vuex'
-import '@riophae/vue-treeselect/dist/vue-treeselect.css'
-import { LOAD_CHILDREN_OPTIONS } from '@riophae/vue-treeselect'
+  import {listUser, getUser, delUser, addUser, updateUser, resetUserPwd, changeUserStatus} from "@/api/system/user";
+  import {listRole} from "@/api/system/role";
+  import Treeselect from "@riophae/vue-treeselect";
+  import "@riophae/vue-treeselect/dist/vue-treeselect.css";
+  import initData from '@/mixins/initData'
 
-let userRoles = []
-const userJobs = []
-const defaultForm = {
-  id: null,
-  username: null,
-  nickName: null,
-  gender: '男',
-  email: null,
-  enabled: 'false',
-  roles: [],
-  phone: null
-}
-export default {
-  name: 'User',
-  components: { Treeselect, crudOperation, rrOperation, udOperation, pagination },
-  cruds() {
-    return CRUD({ title: '用户', url: 'api/users', crudMethod: { ...crudUser }})
-  },
-  mixins: [presenter(), header(), form(defaultForm), crud()],
-  // 数据字典
-  dicts: ['user_status'],
-  data() {
-    // 自定义验证
-    const validPhone = (rule, value, callback) => {
-      if (!value) {
-        callback(new Error('请输入电话号码'))
-      } else if (!isvalidPhone(value)) {
-        callback(new Error('请输入正确的11位手机号码'))
-      } else {
-        callback()
-      }
-    }
-    return {
-      height: document.documentElement.clientHeight - 180 + 'px;',
-      deptName: '', depts: [], deptDatas: [], jobs: [], level: 3, roles: [],
-      defaultProps: { children: 'children', label: 'name', isLeaf: 'leaf' },
-      permission: {
-        add: ['admin', 'user:add'],
-        edit: ['admin', 'user:edit'],
-        del: ['admin', 'user:del']
-      },
-      enabledTypeOptions: [
-        { key: 'true', display_name: '激活' },
-        { key: 'false', display_name: '锁定' }
-      ],
-      rules: {
-        username: [
-          { required: true, message: '请输入用户名', trigger: 'blur' },
-          { min: 2, max: 20, message: '长度在 2 到 20 个字符', trigger: 'blur' }
-        ],
-        nickName: [
-          { required: true, message: '请输入用户昵称', trigger: 'blur' },
-          { min: 2, max: 20, message: '长度在 2 到 20 个字符', trigger: 'blur' }
-        ],
-        email: [
-          { required: true, message: '请输入邮箱地址', trigger: 'blur' },
-          { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
-        ],
-        phone: [
-          { required: true, trigger: 'blur', validator: validPhone }
-        ]
-      }
-    }
-  },
-  computed: {
-    ...mapGetters([
-      'user'
-    ])
-  },
-  created() {
-    this.crud.msg.add = '新增成功，默认密码：123456'
-  },
-  mounted: function() {
-    const that = this
-    window.onresize = function temp() {
-      that.height = document.documentElement.clientHeight - 180 + 'px;'
-    }
-  },
-  methods: {
-    changeRole(value) {
-      userRoles = []
-      value.forEach(function(data, index) {
-        const role = { id: data }
-        userRoles.push(role)
-      })
-    },
-    [CRUD.HOOK.afterAddError](crud) {
-      this.afterErrorMethod(crud)
-    },
-    [CRUD.HOOK.afterEditError](crud) {
-      this.afterErrorMethod(crud)
-    },
-    afterErrorMethod(crud) {
-      // 恢复select
-      const initRoles = []
-      userRoles.forEach(function(role, index) {
-        initRoles.push(role.id)
-      })
-      crud.form.roles = initRoles
-    },
-    deleteTag(value) {
-      userRoles.forEach(function(data, index) {
-        if (data.id === value) {
-          userRoles.splice(index, value)
+  export default {
+    mixins: [initData],
+    components: {Treeselect},
+    data() {
+      return {
+        // 默认密码
+        initPassword: "123456",
+        // 状态数据字典
+        statusOptions: [],
+        // 性别状态字典
+        sexOptions: [],
+        // 角色选项
+        roleOptions: [],
+        defaultProps: {
+          children: "children",
+          label: "label"
+        },
+        // 查询参数
+        queryParams: {
+          userName: undefined,
+          phone: undefined,
+          status: undefined,
+        },
+        // 表单校验
+        rules: {
+          userName: [
+            {required: true, message: "用户名称不能为空", trigger: "blur"}
+          ],
+          nickName: [
+            {required: true, message: "用户昵称不能为空", trigger: "blur"}
+          ],
+          password: [
+            {required: true, message: "用户密码不能为空", trigger: "blur"}
+          ],
+          email: [
+            {
+              type: "email",
+              message: "'请输入正确的邮箱地址",
+              trigger: ["blur", "change"]
+            }
+          ],
+          phone: [
+            {
+              pattern: /^1[3|4|5|6|7|8|9][0-9]\d{8}$/,
+              message: "请输入正确的手机号码",
+              trigger: "blur"
+            }
+          ]
         }
-      })
+      };
     },
-    // 新增与编辑前做的操作
-    [CRUD.HOOK.afterToCU](crud, form) {
-      this.getRoles()
-      this.getRoleLevel()
-      form.enabled = form.enabled.toString()
+    created() {
+      this.$nextTick(() => {
+        this.init()
+      });
+      this.getDicts("sys_normal_disable").then(response => {
+        this.statusOptions = response.data;
+      });
+      this.getDicts("sys_user_sex").then(response => {
+        this.sexOptions = response.data;
+      });
     },
-    // 打开编辑弹窗前做的操作
-    [CRUD.HOOK.beforeToEdit](crud, form) {
-      userRoles = []
-      const roles = []
-      form.roles.forEach(function(role, index) {
-        roles.push(role.id)
-        // 初始化编辑时候的角色
-        const rol = { id: role.id }
-        userRoles.push(rol)
-      })
-      form.roles = roles
-    },
-    // 提交前做的操作
-    [CRUD.HOOK.afterValidateCU](crud) {
-      if (crud.form.roles.length === 0) {
-        this.$message({
-          message: '角色不能为空',
-          type: 'warning'
-        })
-        return false
-      }
-      crud.form.roles = userRoles
-      return true
-    },
-
-    // 改变状态
-    changeEnabled(data, val) {
-      this.$confirm('此操作将 "' + this.dict.label.user_status[val] + '" ' + data.username + ', 是否继续？', '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }).then(() => {
-        crudUser.edit(data).then(res => {
-          this.crud.notify(this.dict.label.user_status[val] + '成功', CRUD.NOTIFICATION_TYPE.SUCCESS)
+    methods: {
+      beforeInit() {
+        this.base = '/system/user';
+        this.modelName = '用户';
+        return true
+      },
+      // 筛选节点
+      filterNode(value, data) {
+        if (!value) return true;
+        return data.label.indexOf(value) !== -1;
+      },
+      /** 查询角色列表 */
+      getRoles() {
+        listRole().then(response => {
+          this.roleOptions = response.rows;
+        });
+      },
+      // 用户状态修改
+      handleStatusChange(row) {
+        let text = row.status === "0" ? "启用" : "停用";
+        this.$confirm('确认要"' + text + '""' + row.userName + '"用户吗?', "警告", {
+          confirmButtonText: "确定",
+          cancelButtonText: "取消",
+          type: "warning"
+        }).then(function () {
+          return changeUserStatus(row.id, row.status);
+        }).then((response) => {
+          if (response.code == 200) {
+            this.msgSuccess(text + "成功");
+          } else {
+            this.msgError(text + "失败");
+          }
+        }).catch(function () {
+          row.status = row.status === "0" ? "1" : "0";
+        });
+      },
+      /** 新增按钮操作 */
+      handleAdd() {
+        this.reset();
+        this.getRoles();
+        this.open = true;
+        this.title = "添加用户";
+        this.form.password = this.initPassword;
+      },
+      /** 修改按钮操作 */
+      handleUpdate(row) {
+        this.reset();
+        this.getRoles();
+        getUser(row.id).then(response => {
+          this.form = response.data;
+          this.form.roleIds = response.roleIds;
+          this.open = true;
+          this.title = "修改用户";
+          this.form.password = "";
+        });
+      },
+      /** 重置密码按钮操作 */
+      handleResetPwd(row) {
+        this.$prompt('请输入"' + row.userName + '"的新密码', "提示", {
+          confirmButtonText: "确定",
+          cancelButtonText: "取消"
+        }).then(({value}) => {
+          resetUserPwd(row.id, value).then(response => {
+            if (response.code === 200) {
+              this.msgSuccess("修改成功，新密码是：" + value);
+            } else {
+              this.msgError(response.msg);
+            }
+          });
         }).catch(() => {
-          data.enabled = !data.enabled
-        })
-      }).catch(() => {
-        data.enabled = !data.enabled
-      })
-    },
-    // 获取弹窗内角色数据
-    getRoles() {
-      getAll().then(res => {
-        this.roles = res
-      }).catch(() => {
-      })
-    },
-
-    // 获取权限级别
-    getRoleLevel() {
-      getLevel().then(res => {
-        this.level = res.level
-      }).catch(() => {
-      })
-    },
-    checkboxT(row, rowIndex) {
-      return row.id !== this.user.id
+        });
+      },
+      /** 提交按钮 */
+      submitForm: function () {
+        this.$refs["form"].validate(valid => {
+          if (valid) {
+            if (this.form.id != undefined) {
+              updateUser(this.form).then(response => {
+                if (response.code === 200) {
+                  this.msgSuccess("修改成功");
+                  this.open = false;
+                  this.init();
+                } else {
+                  this.msgError(response.msg);
+                }
+              });
+            } else {
+              addUser(this.form).then(response => {
+                if (response.code === 200) {
+                  this.msgSuccess("新增成功");
+                  this.open = false;
+                  this.init();
+                } else {
+                  this.msgError(response.msg);
+                }
+              });
+            }
+          }
+        });
+      },
     }
-  }
-}
+  };
 </script>
-
-<style rel="stylesheet/scss" lang="scss" scoped>
-  /deep/ .vue-treeselect__control, /deep/ .vue-treeselect__placeholder, /deep/ .vue-treeselect__single-value {
-    height: 30px;
-    line-height: 30px;
-  }
-</style>

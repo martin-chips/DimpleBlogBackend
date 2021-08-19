@@ -1,3 +1,4 @@
+// ESlint 检查配置
 module.exports = {
   root: true,
   parserOptions: {
@@ -195,4 +196,4 @@ module.exports = {
     }],
     'array-bracket-spacing': [2, 'never']
   }
-}
+};

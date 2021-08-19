@@ -1,8 +1,6 @@
 <template>
   <div v-if="!item.hidden" class="menu-wrapper">
-    <template
-      v-if="hasOneShowingChild(item.children,item) && (!onlyOneChild.children||onlyOneChild.noShowingChildren)&&!item.alwaysShow"
-    >
+    <template v-if="hasOneShowingChild(item.children,item) && (!onlyOneChild.children||onlyOneChild.noShowingChildren)&&!item.alwaysShow">
       <app-link v-if="onlyOneChild.meta" :to="resolvePath(onlyOneChild.path)">
         <el-menu-item :index="resolvePath(onlyOneChild.path)" :class="{'submenu-title-noDropdown':!isNest}">
           <item :icon="onlyOneChild.meta.icon||(item.meta&&item.meta.icon)" :title="onlyOneChild.meta.title" />
@@ -53,9 +51,7 @@ export default {
     }
   },
   data() {
-    // To fix https://github.com/PanJiaChen/vue-admin-template/issues/237
-    // TODO: refactor with render function
-    this.onlyOneChild = null
+    this.onlyOneChild = null;
     return {}
   },
   methods: {
@@ -65,10 +61,10 @@ export default {
           return false
         } else {
           // Temp set(will be used if only has one showing child)
-          this.onlyOneChild = item
+          this.onlyOneChild = item;
           return true
         }
-      })
+      });
 
       // When there is only one child router, the child router is displayed by default
       if (showingChildren.length === 1) {
@@ -77,7 +73,7 @@ export default {
 
       // Show parent if there are no child router to display
       if (showingChildren.length === 0) {
-        this.onlyOneChild = { ...parent, path: '', noShowingChildren: true }
+        this.onlyOneChild = { ... parent, path: '', noShowingChildren: true };
         return true
       }
 

@@ -1,43 +1,53 @@
-import { constantRouterMap } from '@/router/routers'
+import { constantRoutes } from '@/router/routers'
+import { getRouters } from '@/api/menu'
 import Layout from '@/layout/index'
 
 const permission = {
   state: {
-    routers: constantRouterMap,
-    addRouters: []
+    routes: [],
+    addRoutes: []
   },
   mutations: {
-    SET_ROUTERS: (state, routers) => {
-      state.addRouters = routers
-      state.routers = constantRouterMap.concat(routers)
+    SET_ROUTES: (state, routes) => {
+      state.addRoutes = routes;
+      state.routes = constantRoutes.concat(routes)
     }
   },
   actions: {
-    GenerateRoutes({ commit }, asyncRouter) {
-      commit('SET_ROUTERS', asyncRouter)
+    // 生成路由
+    GenerateRoutes({ commit }) {
+      return new Promise(resolve => {
+        // 向后端请求路由数据
+        getRouters().then(res => {
+          const accessedRoutes = filterAsyncRouter(res.data);
+          commit('SET_ROUTES', accessedRoutes);
+          resolve(accessedRoutes)
+        })
+      })
     }
   }
-}
+};
 
-export const filterAsyncRouter = (routers) => { // 遍历后台传来的路由字符串，转换为组件对象
-  return routers.filter(router => {
-    if (router.component) {
-      if (router.component === 'Layout') { // Layout组件特殊处理
-        router.component = Layout
+// 遍历后台传来的路由字符串，转换为组件对象
+function filterAsyncRouter(asyncRouterMap) {
+  return asyncRouterMap.filter(route => {
+    if (route.component) {
+      // Layout组件特殊处理
+      if (route.component === 'Layout') {
+        route.component = Layout
       } else {
-        const component = router.component
-        router.component = loadView(component)
+        route.component = loadView(route.component)
       }
     }
-    if (router.children && router.children.length) {
-      router.children = filterAsyncRouter(router.children)
+    if (route.children != null && route.children && route.children.length) {
+      route.children = filterAsyncRouter(route.children)
     }
     return true
   })
 }
 
-export const loadView = (view) => {
-  return (resolve) => require([`@/views/${view}`], resolve)
-}
+export const loadView = (view) => { // 路由懒加载
+  return () => import(`@/views/${view}`)
+};
 
 export default permission
